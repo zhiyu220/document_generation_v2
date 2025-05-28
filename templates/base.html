@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+  <head>
+    <meta charset="UTF-8" />
+    <title>{% block title %}備審系統{% endblock %}</title>
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='style.css') }}"
+    />
+    <style>
+      .paragraph-card {
+        margin-bottom: 20px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        overflow: hidden;
+      }
+
+      .upload-container {
+        background-color: #f8f9fa;
+        padding: 10px;
+        border-radius: 5px;
+        margin-top: 10px;
+      }
+
+      .upload-container input[type="file"] {
+        margin-bottom: 5px;
+      }
+
+      .upload-container button {
+        margin-left: 10px;
+      }
+
+      .paragraph-header {
+        background-color: #f8f9fa;
+        padding: 10px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="layout fade-in">
+      <!-- === Sidebar === -->
+      <aside class="sidebar">
+        <h1 class="logo slide-up delay-1">📄 備審系統</h1>
+        <nav class="nav-menu slide-up delay-2">
+          <h2>功能選單</h2>
+          {% if current_user.is_authenticated %}
+          <button
+            class="tab {% if request.endpoint == 'profile' %}active{% endif %}"
+            onclick="location.href='{{ url_for('profile') }}'"
+          >
+            👤 會員中心
+          </button>
+
+          <button
+            class="tab"
+            onclick="location.href='{{ url_for('purchase') }}'"
+          >
+            💳 升級方案
+          </button>
+
+          <button class="tab" onclick="location.href='{{ url_for('logout') }}'">
+            🚪 登出
+          </button>
+          {% else %}
+          <button
+            class="tab {% if request.endpoint == 'login' %}active{% endif %}"
+            onclick="location.href='{{ url_for('login') }}'"
+          >
+            🔑 登入
+          </button>
+
+          <button
+            class="tab {% if request.endpoint == 'register' %}active{% endif %}"
+            onclick="location.href='{{ url_for('register') }}'"
+          >
+            🆕 註冊
+          </button>
+          {% endif %}
+
+          <hr />
+
+          <button
+            class="tab {% if request.endpoint == 'index' %}active{% endif %}"
+            onclick="location.href='{{ url_for('index') }}'"
+          >
+            🏠 首頁
+          </button>
+          <button
+            class="tab {% if request.endpoint == 'check_requirements' %}active{% endif %}"
+            onclick="location.href='{{ url_for('show_check_page') }}'"
+          >
+            📋 備審準備指引查詢
+          </button>
+          <button
+            class="tab {% if request.endpoint == 'generate_page' %}active{% endif %}"
+            onclick="location.href='{{ url_for('generate_page') }}'"
+          >
+            🛠️ 備審段落生成器
+          </button>
+        </nav>
+      </aside>
+
+      <!-- === Main === -->
+      <main class="main">
+        <section class="content">{% block content %}{% endblock %}</section>
+      </main>
+    </div>
+
+    {% include "qa_widget.html" %}
+
+    <script>
+      document.addEventListener("DOMContentLoaded", () => {
+        let selectedUniversity = "";
+        let selectedDepartment = "";
+
+        // 載入學校清單
+        fetch("/get_universities")
+          .then((res) => res.json())
+          .then((universities) => {
+            const uniSelect = document.getElementById("chat-university");
+            universities.forEach((uni) => {
+              const opt = document.createElement("option");
+              opt.value = uni;
+              opt.textContent = uni;
+              uniSelect.appendChild(opt);
+            });
+
+            uniSelect.addEventListener("change", () => {
+              selectedUniversity = uniSelect.value;
+              loadDepartments(selectedUniversity);
+            });
+          });
+
+        // 載入學系清單
+        function loadDepartments(university) {
+          const deptSelect = document.getElementById("chat-department");
+          deptSelect.innerHTML = '<option value="">請選擇學系</option>';
+
+          fetch(`/get_departments?university=${encodeURIComponent(university)}`)
+            .then((res) => res.json())
+            .then((departments) => {
+              departments.forEach((dept) => {
+                const opt = document.createElement("option");
+                opt.value = dept;
+                opt.textContent = dept;
+                deptSelect.appendChild(opt);
+              });
+
+              deptSelect.addEventListener("change", (e) => {
+                selectedDepartment = e.target.value;
+              });
+            });
+        }
+
+        window.toggleChat = function () {
+          document.getElementById("chat-window").classList.toggle("show");
+        };
+
+        window.sendMessage = function () {
+          const input = document.getElementById("chat-input");
+          const text = input.value.trim();
+          if (!text || !selectedUniversity || !selectedDepartment) {
+            appendMessage("❗ 請先選擇學校與學系，再輸入問題！", "bot");
+            return;
+          }
+          appendMessage(text, "user");
+          input.value = "";
+          appendMessage("⏳ 回覆中...", "bot");
+
+          fetch("/ask", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              university: selectedUniversity,
+              department: selectedDepartment,
+              question: text,
+            }),
+          })
+            .then((res) => res.json())
+            .then((data) => {
+              document.querySelectorAll(".message.bot").forEach((msg) => {
+                if (msg.textContent.includes("回覆中")) msg.remove();
+              });
+              appendMessage(data.answer || "⚠️ 回覆失敗", "bot");
+            });
+        };
+
+        function appendMessage(text, sender = "bot", isLoading = false) {
+          const msg = document.createElement("div");
+          msg.className = `message ${sender}`;
+          if (isLoading) msg.dataset.loading = "true";
+
+          // 清除 Markdown 標記
+          let cleaned = text
+            .replace(/\*\*/g, "") // **粗體**
+            .replace(/`/g, "") // `程式碼`
+            .replace(/[_~#>]/g, "") // 其他符號
+            .replace(/\n{2,}/g, "\n") // 多重換行簡化成一個
+
+            // 重要：將 A - ...、1. ...、B - ... 強制斷行
+            .replace(/([A-Z])\s*-\s*/g, "\n$1 - ")
+            .replace(/(\d+)\.\s*/g, "\n$1. ");
+
+          // 拆成行，轉為段落或清單
+          const lines = cleaned.split("\n");
+          const formattedLines = [];
+          let inList = false;
+
+          lines.forEach((line) => {
+            const trimmed = line.trim();
+            if (!trimmed) return;
+
+            if (/^(\d+\.\s|[A-Z]-\s)/.test(trimmed)) {
+              if (!inList) {
+                formattedLines.push("<ul>");
+                inList = true;
+              }
+              formattedLines.push(
+                `<li>${trimmed.replace(/^(\d+\.\s|[A-Z]-\s)/, "")}</li>`
+              );
+            } else {
+              if (inList) {
+                formattedLines.push("</ul>");
+                inList = false;
+              }
+              formattedLines.push(`<p>${trimmed}</p>`);
+            }
+          });
+          if (inList) formattedLines.push("</ul>");
+
+          msg.innerHTML = formattedLines.join("\n");
+          document.getElementById("chat-body").appendChild(msg);
+          document.getElementById("chat-body").scrollTop =
+            document.getElementById("chat-body").scrollHeight;
+        }
+      });
+    </script>
+  </body>
+</html>

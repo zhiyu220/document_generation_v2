@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block title %}驗證信箱{% endblock %}
+
+{% block content %}
+<div class="verify-container fade-in">
+  <h2 class="slide-up">📩 Email驗證</h2>
+  <p class="slide-up delay-1">我們已將驗證碼寄送到：<strong>{{ email }}</strong></p>
+  <p class="slide-up delay-2">請在下方輸入驗證碼完成註冊。</p>
+
+  {% if error_message %}
+    <div class="error-message slide-up delay-2" style="color: red; margin-bottom: 10px;">
+      {{ error_message }}
+    </div>
+  {% endif %}
+
+  <form method="POST" class="verify-form slide-up delay-3">
+    <div class="form-group">
+      <label for="verification_code">驗證碼</label>
+      <input type="text" name="verification_code" id="verification_code" class="form-control" required placeholder="輸入6位數驗證碼">
+    </div>
+
+    <div class="cta slide-up delay-4">
+      <button type="submit" class="btn btn-primary">提交驗證 ➤</button>
+    </div>
+  </form>
+
+  <div class="resend-code slide-up delay-5" style="margin-top: 20px;">
+    <form method="POST" action="{{ url_for('resend_verification') }}">
+      <input type="hidden" name="email" value="{{ email }}">
+      <button type="submit" class="btn btn-secondary">重新寄送驗證碼 📩</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

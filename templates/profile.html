@@ -1,0 +1,265 @@
+{% extends "base.html" %}
+
+{% block title %}會員中心{% endblock %}
+
+{% block content %}
+<div class="profile-container fade-in">
+  <h2 class="slide-up">👤 會員中心</h2>
+  <div class="user-info slide-up delay-1">
+    <p><strong>Email：</strong> {{ user.email }}</p>
+    <p><strong>會員方案：</strong> {{ user.plan }}</p>
+    <p><strong>驗證狀態：</strong> {{ "已驗證" if user.is_verified else "尚未驗證" }}</p>
+    <p><strong>本月已使用次數：</strong> {{ user.generation_count }} 次</p>
+    <p><strong>本月剩餘次數：</strong> {{ user.generation_quota - user.generation_count }} 次</p>
+    {% if user.plan_expiration %}
+    <p><strong>方案到期日：</strong> {{ user.plan_expiration.strftime('%Y-%m-%d') }}</p>
+    {% endif %}
+  </div>
+
+  {% if user.plan == "Free" %}
+    <div class="cta slide-up delay-2">
+      <a href="/purchase" class="btn btn-warning">升級至 Premium ➤</a>
+    </div>
+  {% endif %}
+
+  <!-- 生成紀錄區塊 -->
+  <div class="history-section slide-up delay-3">
+    <h3>📝 生成紀錄</h3>
+    <div class="history-tabs">
+      <button class="tab active" onclick="showTab('all')">全部</button>
+      <button class="tab" onclick="showTab('favorites')">收藏</button>
+    </div>
+    
+    <div id="history-content">
+      {% for record in history %}
+        <div class="history-card" data-type="{{ 'favorite' if record.is_favorite else 'all' }}">
+          <div class="history-header">
+            <div class="history-info">
+              <span class="school">{{ record.university }} - {{ record.department }}</span>
+              <span class="section">{{ record.section_code }}</span>
+              <span class="date">{{ record.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
+            </div>
+            <div class="history-actions">
+              <button class="btn-favorite" onclick="toggleFavorite('{{ record.id }}', this)" 
+                      data-favorite="{{ 'true' if record.is_favorite else 'false' }}">
+                {{ '★' if record.is_favorite else '☆' }}
+              </button>
+              <button class="btn-copy" onclick="copyToGenerator('{{ record.id }}')">
+                📋 套用
+              </button>
+            </div>
+          </div>
+          <div class="history-content">
+            {{ record.generated_text | safe }}
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<style>
+.history-section {
+  margin-top: 30px;
+  padding: 20px;
+  background: white;
+  border-radius: 10px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.history-tabs {
+  margin-bottom: 20px;
+  border-bottom: 2px solid #eee;
+}
+
+.history-tabs .tab {
+  padding: 10px 20px;
+  margin-right: 10px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 16px;
+  color: #666;
+}
+
+.history-tabs .tab.active {
+  color: #007bff;
+  border-bottom: 2px solid #007bff;
+  margin-bottom: -2px;
+}
+
+.history-card {
+  margin-bottom: 20px;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.history-card:hover {
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.history-header {
+  padding: 15px;
+  background: #f8f9fa;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.history-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.history-info .school {
+  font-weight: bold;
+}
+
+.history-info .section {
+  color: #666;
+}
+
+.history-info .date {
+  color: #999;
+  font-size: 14px;
+}
+
+.history-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.btn-favorite {
+  background: none;
+  border: none;
+  font-size: 20px;
+  color: #ffd700;
+  cursor: pointer;
+  padding: 0 5px;
+}
+
+.btn-copy {
+  padding: 5px 10px;
+  border: 1px solid #007bff;
+  border-radius: 4px;
+  background: white;
+  color: #007bff;
+  cursor: pointer;
+}
+
+.btn-copy:hover {
+  background: #007bff;
+  color: white;
+}
+
+.history-content {
+  padding: 20px;
+  max-height: 200px;
+  overflow-y: auto;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* 動畫效果 */
+.fade-in {
+  animation: fadeIn 0.5s ease-in;
+}
+
+.slide-up {
+  opacity: 0;
+  transform: translateY(20px);
+  animation: slideUp 0.5s ease forwards;
+}
+
+.delay-1 {
+  animation-delay: 0.2s;
+}
+
+.delay-2 {
+  animation-delay: 0.4s;
+}
+
+.delay-3 {
+  animation-delay: 0.6s;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+</style>
+
+<script>
+function showTab(type) {
+  // 更新標籤樣式
+  document.querySelectorAll('.history-tabs .tab').forEach(tab => {
+    tab.classList.remove('active');
+  });
+  event.target.classList.add('active');
+  
+  // 顯示/隱藏對應內容
+  document.querySelectorAll('.history-card').forEach(card => {
+    if (type === 'all' || card.dataset.type === type) {
+      card.style.display = 'block';
+    } else {
+      card.style.display = 'none';
+    }
+  });
+}
+
+function toggleFavorite(id, button) {
+  fetch('/toggle_favorite', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ history_id: id })
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      const card = button.closest('.history-card');
+      button.textContent = data.is_favorite ? '★' : '☆';
+      button.dataset.favorite = data.is_favorite;
+      card.dataset.type = data.is_favorite ? 'favorite' : 'all';
+      
+      // 如果當前在收藏標籤頁，且取消收藏，則隱藏該卡片
+      const activeTab = document.querySelector('.history-tabs .tab.active');
+      if (activeTab.textContent === '收藏' && !data.is_favorite) {
+        card.style.display = 'none';
+      }
+    }
+  })
+  .catch(error => {
+    console.error('Error:', error);
+    alert('操作失敗，請重試');
+  });
+}
+
+function copyToGenerator(id) {
+  try {
+    // 顯示加載提示
+    const loadingToast = document.createElement('div');
+    loadingToast.className = 'save-toast';
+    loadingToast.textContent = '⏳ 正在載入歷史記錄...';
+    document.body.appendChild(loadingToast);
+    
+    // 重定向到生成器頁面
+    window.location.href = `/generate?history_id=${id}`;
+  } catch (error) {
+    console.error('載入歷史記錄時發生錯誤:', error);
+    alert('載入歷史記錄失敗，請重試');
+  }
+}
+</script>
+{% endblock %}

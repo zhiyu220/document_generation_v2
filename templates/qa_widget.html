@@ -1,0 +1,170 @@
+<div id="chat-widget">
+  <div id="chat-toggle" onclick="toggleChat()">🤖</div>
+  <div id="chat-window">
+    <div id="chat-header">
+      <span>備審 Q&A 助理</span>
+      <button onclick="toggleChat()">✖</button>
+    </div>
+    <div id="chat-body"></div>
+
+    <div id="chat-selects">
+      <select id="chat-university">
+        <option value="">請選擇學校</option>
+      </select>
+      <select id="chat-department">
+        <option value="">請選擇學系</option>
+      </select>
+    </div>
+    <div id="chat-input-box">
+      <input
+        type="text"
+        id="chat-input"
+        placeholder="請輸入你的問題..."
+        onkeypress="if(event.key==='Enter') sendMessage()"
+      />
+      <button onclick="sendMessage()">送出</button>
+    </div>
+  </div>
+</div>
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    let selectedUniversity = "";
+    let selectedDepartment = "";
+    let schoolData = {};
+
+    async function loadSchoolsAndDepartments() {
+      const schoolSelect = document.getElementById("chat-university");
+      const departmentSelect = document.getElementById("chat-department");
+
+      try {
+        // Only load universities initially
+        const uniResponse = await fetch("/get_universities");
+        const universities = await uniResponse.json();
+
+        // Clear and populate university select
+        schoolSelect.innerHTML = '<option value="">請選擇學校</option>';
+        universities.forEach(uni => {
+          const option = document.createElement("option");
+          option.value = uni;
+          option.textContent = uni;
+          schoolSelect.appendChild(option);
+        });
+
+        // Add change event listener to load departments only when university is selected
+        schoolSelect.onchange = async () => {
+          const selectedSchool = schoolSelect.value;
+          departmentSelect.innerHTML = '<option value="">請選擇學系</option>';
+          
+          if (selectedSchool) {
+            try {
+              const deptResponse = await fetch(`/get_departments?university=${encodeURIComponent(selectedSchool)}`);
+              const departments = await deptResponse.json();
+              
+              departments.forEach(dept => {
+                const deptOption = document.createElement("option");
+                deptOption.value = dept;
+                deptOption.textContent = dept;
+                departmentSelect.appendChild(deptOption);
+              });
+            } catch (error) {
+              console.error("Error loading departments:", error);
+            }
+          }
+        };
+
+      } catch (error) {
+        console.error("Error loading universities:", error);
+      }
+    }
+
+    // Initial load
+    loadSchoolsAndDepartments();
+
+    window.toggleChat = function () {
+      const chatWindow = document.getElementById("chat-window");
+      if (chatWindow.classList.contains("show")) {
+        chatWindow.classList.remove("show");
+      } else {
+        chatWindow.classList.add("show");
+      }
+    };
+
+    function appendMessage(text, sender = "bot", isLoading = false) {
+      const msg = document.createElement("div");
+      msg.className = `message ${sender}`;
+      if (isLoading) msg.dataset.loading = "true";
+
+      // 清除 Markdown 標記
+      let cleaned = text
+        .replace(/\*\*/g, "") // **粗體**
+        .replace(/`/g, "") // `程式碼`
+        .replace(/[_~#>]/g, "") // 其他符號
+        .replace(/\n{2,}/g, "\n") // 多重換行簡化成一個
+
+        // 重要：將 A - ...、1. ...、B - ... 強制斷行
+        .replace(/([A-Z])\s*-\s*/g, "\n$1 - ")
+        .replace(/(\d+)\.\s*/g, "\n$1. ");
+
+      // 拆成行，轉為段落或清單
+      const lines = cleaned.split("\n");
+      const formattedLines = [];
+      let inList = false;
+
+      lines.forEach((line) => {
+        const trimmed = line.trim();
+        if (!trimmed) return;
+
+        if (/^(\d+\.\s|[A-Z]-\s)/.test(trimmed)) {
+          if (!inList) {
+            formattedLines.push("<ul>");
+            inList = true;
+          }
+          formattedLines.push(
+            `<li>${trimmed.replace(/^(\d+\.\s|[A-Z]-\s)/, "")}</li>`
+          );
+        } else {
+          if (inList) {
+            formattedLines.push("</ul>");
+            inList = false;
+          }
+          formattedLines.push(`<p>${trimmed}</p>`);
+        }
+      });
+      if (inList) formattedLines.push("</ul>");
+
+      msg.innerHTML = formattedLines.join("\n");
+      document.getElementById("chat-body").appendChild(msg);
+      document.getElementById("chat-body").scrollTop =
+        document.getElementById("chat-body").scrollHeight;
+    }
+
+    window.sendMessage = function () {
+      const input = document.getElementById("chat-input");
+      const text = input.value.trim();
+      if (!text || !selectedUniversity || !selectedDepartment) {
+        appendMessage("❗ 請先選擇學校與學系，再輸入問題！", "bot");
+        return;
+      }
+      appendMessage(text, "user");
+      input.value = "";
+      appendMessage("⏳ 回覆中...", "bot", true);
+
+      fetch("/ask", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          university: selectedUniversity,
+          department: selectedDepartment,
+          question: text,
+        }),
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          document
+            .querySelectorAll(".message.bot[data-loading='true']")
+            .forEach((msg) => msg.remove());
+          appendMessage(data.answer || "⚠️ 回覆失敗", "bot");
+        });
+    };
+  });
+</script>

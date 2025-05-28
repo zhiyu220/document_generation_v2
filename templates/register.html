@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+
+{% block title %}註冊{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="text-center">註冊帳號</h3>
+                </div>
+                <div class="card-body">
+                    <div id="error-message" class="alert alert-danger" style="display: none;"></div>
+                    <form id="register-form" method="post">
+                        <div class="form-group mb-3">
+                            <label for="email">電子郵件</label>
+                            <input type="email" class="form-control" id="email" name="email" required>
+                        </div>
+                        <div class="form-group mb-3">
+                            <label for="password">密碼</label>
+                            <input type="password" class="form-control" id="password" name="password" required>
+                        </div>
+                        <div class="form-group mb-3">
+                            <label for="confirm_password">確認密碼</label>
+                            <input type="password" class="form-control" id="confirm_password" name="confirm_password" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100">註冊</button>
+                    </form>
+                    <div class="mt-3 text-center">
+                        <p>已有帳號？<a href="{{ url_for('login') }}">登入</a></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('register-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    // 隱藏錯誤訊息
+    document.getElementById('error-message').style.display = 'none';
+    
+    // 取得表單數據
+    const formData = new FormData(this);
+    
+    // 發送請求
+    fetch('/register', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // 註冊成功，重定向到驗證頁面
+            window.location.href = data.redirect;
+        } else {
+            // 顯示錯誤訊息
+            const errorMessage = document.getElementById('error-message');
+            errorMessage.textContent = data.message;
+            errorMessage.style.display = 'block';
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        const errorMessage = document.getElementById('error-message');
+        errorMessage.textContent = '系統錯誤，請稍後再試';
+        errorMessage.style.display = 'block';
+    });
+});
+</script>
+
+<style>
+.register-container {
+  max-width: 400px;
+  margin: 40px auto;
+  padding: 20px;
+  opacity: 0;  /* 設置初始狀態 */
+  animation: fadeIn 0.5s ease-in forwards;
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-control {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  margin-top: 5px;
+}
+
+.form-text {
+  font-size: 12px;
+  color: #6c757d;
+  margin-top: 5px;
+}
+
+.btn-primary {
+  width: 100%;
+  padding: 10px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-bottom: 10px;
+}
+
+.btn-link {
+  color: #007bff;
+  text-decoration: none;
+  display: block;
+  text-align: center;
+}
+
+.btn-link:hover {
+  text-decoration: underline;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { 
+    transform: translateY(20px); 
+    opacity: 0; 
+  }
+  to { 
+    transform: translateY(0); 
+    opacity: 1; 
+  }
+}
+
+.slide-up {
+  opacity: 0;  /* 設置初始狀態 */
+  animation: slideUp 0.5s ease-out forwards;
+}
+
+.delay-1 {
+  animation-delay: 0.2s;
+}
+
+.delay-2 {
+  animation-delay: 0.4s;
+}
+
+.delay-3 {
+  animation-delay: 0.6s;
+}
+</style>
+{% endblock %}

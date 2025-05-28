@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block title %}購買升級{% endblock %}
+
+{% block content %}
+<div class="purchase-container fade-in">
+  <h2 class="slide-up">🛒 購買升級方案</h2>
+
+  <div class="user-status slide-up delay-1">
+    <p><strong>目前會員等級：</strong> {{ current_plan }}</p>
+  </div>
+
+  <form method="POST" class="purchase-form slide-up delay-2" id="purchase-form">
+    <input type="hidden" name="plan" id="selected-plan">
+
+    <div class="row">
+      {% set plans = [
+        {"key": "Free", "icon": "🆓", "price": "NT$0", "desc": "- 每日 3 次\n- 基本功能\n- 無優先處理"},
+        {"key": "Pro", "icon": "🚀", "price": "NT$99 / 月", "desc": "- 每日 10 次\n- 適合活躍使用者\n- 普通速度"},
+        {"key": "Premium", "icon": "🌟", "price": "NT$199 / 月", "desc": "- 無限次數\n- 快速優先處理\n- 全功能開放"}
+      ] %}      
+
+      {% for plan in plans %}
+        <div class="col-md-4">
+          <div class="membership-card {% if plan.key == current_plan %}current{% endif %}" 
+               data-plan="{{ plan.key }}"
+               {% if plan.key == current_plan %}data-current="true"{% endif %}>
+               <div class="membership-title">
+                {{ plan.icon }} {{ plan.key }}
+                <span style="float: right; font-size: 16px; color: #007bff;">{{ plan.price }}</span>
+              </div>              
+            <div class="membership-benefit">
+              {{ plan.desc | replace('\n', '<br>') | safe }}
+            </div>
+            {% if plan.key == current_plan %}
+              <div class="badge-current">✅ 目前方案</div>
+            {% endif %}
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+
+    <button type="submit" class="btn btn-success mt-3" disabled id="submit-btn">立即升級 ➤</button>
+  </form>
+</div>
+
+<script>
+  const cards = document.querySelectorAll(".membership-card");
+  const selectedPlanInput = document.getElementById("selected-plan");
+  const submitBtn = document.getElementById("submit-btn");
+
+  cards.forEach((card) => {
+    // 不能選目前方案
+    if (card.dataset.current === "true") return;
+
+    card.addEventListener("click", () => {
+      cards.forEach((c) => c.classList.remove("selected"));
+      card.classList.add("selected");
+
+      const plan = card.getAttribute("data-plan");
+      selectedPlanInput.value = plan;
+      submitBtn.disabled = false;
+    });
+  });
+</script>
+{% endblock %}

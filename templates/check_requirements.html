@@ -1,0 +1,536 @@
+{% extends "base.html" %}
+
+{% block title %}查詢需繳交資料與學系特色{% endblock %}
+{% block content %}
+
+<h2>📋 備審準備指引查詢</h2>
+<form method="POST" action="{{ url_for('check_requirements') }}">
+    <label for="university">學校：</label>
+    <select name="university" id="university" class="form-control-check" required onchange="loadDepartments(this.value)">
+        <option value="">請選擇</option>
+        {% for u, _ in all_options %}
+            <option value="{{ u }}" {% if u == university %}selected{% endif %}>{{ u }}</option>
+        {% endfor %}
+    </select>
+
+    <label for="department">學系：</label>
+    <select name="department" id="department" class="form-control-check" required>
+        {% if department %}
+            <option value="{{ department }}" selected>{{ department }}</option>
+        {% else %}
+            <option value="">請選擇</option>
+        {% endif %}
+    </select>
+
+    <button type="submit" class="btn btn-secondary">查詢</button>
+</form>
+
+{% if results %}
+    <div class="results-container">
+        <div class="section">
+            <h2>✅ 需繳交資料</h2>
+            <div class="requirements-box">
+                <ul>
+                    {% for code, name in results %}
+                        <li><strong>{{ code }}</strong>: {{ name }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>🎓 學系特色與培養重點</h2>
+            <div class="features-box">
+                {% if features %}
+                    <div id="raw-features" style="display: none;">{{ features | safe }}</div>
+                    <div id="parsed-features"></div>
+                {% else %}
+                    <p>暫無學系特色資料</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>📝 備審資料準備建議</h2>
+            <div class="suggestions-box">
+                {% if suggestions %}
+                    <div id="raw-suggestions" style="display: none;">{{ suggestions | safe }}</div>
+                    <div id="parsed-suggestions"></div>
+                {% else %}
+                    <p>暫無備審建議資料</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="action-buttons" style="text-align: center; margin-top: 20px;">
+            <a href="{{ url_for('generate_page', university=university, department=department) }}" class="start-writing-btn">
+                <span class="btn-icon">✏️</span>
+                <span class="btn-text">開始撰寫備審資料</span>
+            </a>
+        </div>
+    </div>
+
+    <style>
+        .results-container {
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 20px;
+        }
+        .section {
+            margin-bottom: 30px;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            padding: 20px;
+        }
+        .section h2 {
+            color: #2c3e50;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+        .requirements-box, .features-box, .suggestions-box {
+            background: #f8f9fa;
+            border-radius: 6px;
+            padding: 15px;
+            margin-top: 10px;
+        }
+        .requirements-box ul {
+            list-style-type: none;
+            padding-left: 0;
+        }
+        .requirements-box li {
+            margin-bottom: 8px;
+            padding: 8px;
+            background: white;
+            border-radius: 4px;
+            border-left: 4px solid #007bff;
+        }
+        .features-box, .suggestions-box {
+            line-height: 1.6;
+        }
+        .form-control-check {
+            margin: 10px;
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+        }
+        .btn-secondary {
+            background-color: #007bff;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .btn-secondary:hover {
+            background-color: #0056b3;
+        }
+        
+        /* 新增卡片式列點樣式 */
+        .features-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 30px;
+            margin-top: 20px;
+        }
+        .feature-section {
+            margin-bottom: 20px;
+        }
+        .feature-section h3 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-size: 1.3em;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #e9ecef;
+        }
+        .feature-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 15px;
+        }
+        .feature-card {
+            background: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            border-left: 4px solid #007bff;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            display: flex;
+            align-items: flex-start;
+            line-height: 1.5;
+        }
+        .feature-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .feature-card.cultivation {
+            border-left-color: #28a745;
+        }
+        .feature-icon {
+            margin-right: 12px;
+            font-size: 1.2em;
+            color: #007bff;
+            flex-shrink: 0;
+        }
+        .cultivation .feature-icon {
+            color: #28a745;
+        }
+        @media (max-width: 768px) {
+            .feature-cards {
+                grid-template-columns: 1fr;
+            }
+            
+            .feature-card {
+                margin-bottom: 10px;
+            }
+        }
+
+        /* 備審建議樣式 */
+        .suggestions-section {
+            margin-bottom: 30px;
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+
+        .suggestions-header {
+            background: #f8f9fa;
+            padding: 15px 20px;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .suggestions-header h3 {
+            color: #2c3e50;
+            margin: 0;
+            font-size: 1.2em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .suggestions-content {
+            padding: 20px;
+        }
+
+        .suggestion-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 15px;
+            padding: 12px;
+            margin-bottom: 10px;
+            background: #fff;
+            border-radius: 8px;
+            border-left: 3px solid #6c757d;
+            transition: all 0.2s ease;
+        }
+
+        .suggestion-item:hover {
+            transform: translateX(5px);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+        }
+
+        .suggestion-icon {
+            font-size: 1.2em;
+            color: #6c757d;
+            flex-shrink: 0;
+        }
+
+        .suggestion-text {
+            flex: 1;
+            line-height: 1.6;
+        }
+
+        /* 不同類型的建議使用不同的顏色 */
+        .suggestions-section.abilities .suggestion-item {
+            border-left-color: #007bff;
+        }
+
+        .suggestions-section.abilities .suggestion-icon {
+            color: #007bff;
+        }
+
+        .suggestions-section.presentation .suggestion-item {
+            border-left-color: #28a745;
+        }
+
+        .suggestions-section.presentation .suggestion-icon {
+            color: #28a745;
+        }
+
+        .suggestions-section.avoid .suggestion-item {
+            border-left-color: #dc3545;
+        }
+
+        .suggestions-section.avoid .suggestion-icon {
+            color: #dc3545;
+        }
+
+        @media (max-width: 768px) {
+            .suggestion-item {
+                flex-direction: row;
+                padding: 10px;
+            }
+            
+            .suggestion-icon {
+                font-size: 1em;
+            }
+        }
+
+        /* 開始撰寫按鈕樣式 */
+        .action-buttons {
+            padding: 30px 0;
+            position: relative;
+        }
+
+        .start-writing-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            padding: 16px 32px;
+            background: linear-gradient(135deg, #4CAF50, #45a049);
+            color: white;
+            text-decoration: none;
+            border-radius: 50px;
+            font-size: 1.2em;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.2);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .start-writing-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(76, 175, 80, 0.3);
+            color: white;
+            text-decoration: none;
+        }
+
+        .start-writing-btn:active {
+            transform: translateY(1px);
+            box-shadow: 0 2px 10px rgba(76, 175, 80, 0.2);
+        }
+
+        .start-writing-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, rgba(255,255,255,0.1), rgba(255,255,255,0));
+            transform: translateX(-100%);
+            transition: transform 0.6s ease;
+        }
+
+        .start-writing-btn:hover::before {
+            transform: translateX(100%);
+        }
+
+        .btn-icon {
+            font-size: 1.2em;
+            line-height: 1;
+        }
+
+        .btn-text {
+            font-weight: 500;
+            letter-spacing: 0.5px;
+        }
+
+        @media (max-width: 768px) {
+            .start-writing-btn {
+                padding: 14px 28px;
+                font-size: 1.1em;
+            }
+        }
+
+        /* 添加浮動動畫效果 */
+        @keyframes float {
+            0% {
+                transform: translateY(0px);
+            }
+            50% {
+                transform: translateY(-5px);
+            }
+            100% {
+                transform: translateY(0px);
+            }
+        }
+
+        .start-writing-btn {
+            animation: float 3s ease-in-out infinite;
+        }
+
+        .start-writing-btn:hover {
+            animation-play-state: paused;
+        }
+    </style>
+{% elif university %}
+    <p class="no-results">查無相關備審資料，請確認選擇是否正確。</p>
+{% endif %}
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+<script>
+function loadUniversities() {
+    $.get("/get_universities", function (data) {
+        $("#university").empty().append('<option value="">請選擇學校</option>');
+        data.forEach((uni) => {
+            $("#university").append(`<option value="${uni}">${uni}</option>`);
+        });
+    });
+}
+
+function loadDepartments() {
+    let university = $("#university").val();
+    if (!university) {
+        $("#department").empty().append('<option value="">請先選擇學校</option>');
+        return;
+    }
+
+    $.get(`/get_departments?university=${encodeURIComponent(university)}`, function (departments) {
+        $("#department").empty().append('<option value="">請選擇學系</option>');
+        departments.forEach((dept) => {
+            $("#department").append(`<option value="${dept}">${dept}</option>`);
+        });
+    });
+}
+
+function parseAndDisplayFeatures() {
+    const rawFeatures = document.getElementById('raw-features');
+    if (!rawFeatures) return;
+
+    const featuresText = rawFeatures.textContent.trim();
+    console.log('Raw features text:', featuresText); // 調試用
+
+    // 使用正則表達式找出所有以「一、」「二、」等開頭的段落
+    const sections = featuresText.split(/([一二三四五六七八九十]+、[^\n]+)/)
+        .filter(Boolean)
+        .reduce((acc, curr, i, arr) => {
+            if (curr.match(/^[一二三四五六七八九十]+、/)) {
+                // 這是一個標題
+                acc.push({
+                    title: curr,
+                    content: arr[i + 1] ? arr[i + 1].trim() : ''
+                });
+            }
+            return acc;
+        }, []);
+
+    console.log('Parsed sections:', sections); // 調試用
+
+    let featuresHtml = '<div class="features-grid">';
+    
+    sections.forEach(section => {
+        const title = section.title.replace(/^[一二三四五六七八九十]+、/, '').trim();
+        const items = section.content
+            .split(/\n/)
+            .map(line => line.trim())
+            .filter(line => line.length > 0);
+
+        if (items.length > 0) {
+            const isFeatures = title.includes('學系特色');
+            featuresHtml += `
+                <div class="feature-section">
+                    <h3>${title}</h3>
+                    <div class="feature-cards">
+                        ${items.map(item => `
+                            <div class="feature-card ${!isFeatures ? 'cultivation' : ''}">
+                                <span class="feature-icon">
+                                    ${isFeatures ? '🎯' : '🎓'}
+                                </span>
+                                ${item.trim()}
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+    });
+    
+    featuresHtml += '</div>';
+    document.getElementById('parsed-features').innerHTML = featuresHtml;
+}
+
+function parseAndDisplaySuggestions() {
+    const rawSuggestions = document.getElementById('raw-suggestions');
+    if (!rawSuggestions) return;
+
+    const suggestionsText = rawSuggestions.textContent.trim();
+    console.log('Raw suggestions text:', suggestionsText);
+
+    // 使用正則表達式分割各個部分
+    const sections = suggestionsText.split(/([一二三四五六七八九十]+、[^\n]+)/)
+        .filter(Boolean)
+        .reduce((acc, curr, i, arr) => {
+            if (curr.match(/^[一二三四五六七八九十]+、/)) {
+                acc.push({
+                    title: curr,
+                    content: arr[i + 1] ? arr[i + 1].trim() : ''
+                });
+            }
+            return acc;
+        }, []);
+
+    let suggestionsHtml = '';
+    
+    sections.forEach(section => {
+        const title = section.title.replace(/^[一二三四五六七八九十]+、/, '').trim();
+        
+        // 根據標題內容決定區段類型和圖標
+        let sectionClass = '';
+        let headerIcon = '';
+        if (title.includes('能力') || title.includes('特質')) {
+            sectionClass = 'abilities';
+            headerIcon = '💪';
+        } else if (title.includes('呈現') || title.includes('撰寫')) {
+            sectionClass = 'presentation';
+            headerIcon = '📝';
+        } else if (title.includes('問題') || title.includes('避免')) {
+            sectionClass = 'avoid';
+            headerIcon = '⚠️';
+        }
+
+        // 分割內容為獨立項目
+        const items = section.content.split(/(?<=。)/).filter(item => item.trim());
+
+        suggestionsHtml += `
+            <div class="suggestions-section ${sectionClass}">
+                <div class="suggestions-header">
+                    <h3>${headerIcon} ${title}</h3>
+                </div>
+                <div class="suggestions-content">
+                    ${items.map(item => {
+                        // 根據內容類型選擇適當的圖標
+                        let itemIcon = '📌';
+                        if (item.includes('避免')) itemIcon = '⚠️';
+                        else if (item.includes('建議')) itemIcon = '💡';
+                        else if (item.includes('能力')) itemIcon = '💪';
+                        
+                        return `
+                            <div class="suggestion-item">
+                                <span class="suggestion-icon">${itemIcon}</span>
+                                <div class="suggestion-text">${item.trim()}</div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            </div>
+        `;
+    });
+
+    document.getElementById('parsed-suggestions').innerHTML = suggestionsHtml;
+}
+
+$(document).ready(function () {
+    loadUniversities();
+    
+    // 等待 DOM 完全加載後再解析
+    setTimeout(() => {
+        parseAndDisplayFeatures();
+        parseAndDisplaySuggestions();
+    }, 100);
+});
+</script>
+{% endblock %}
